@@ -11,4 +11,5 @@ module.exports = {
   CACHE_DIR: "./cache",
   PRICE_CACHE_TIME: 1000 * 30, //30s. Allows us to constantly fetch the price and re-fetch/save if needed
   MARKET_CACHE_TIME: 1000 * 60 * 60 * 1, //1h. No need to re-fetch markets each time
+  MAX_LEVERAGE_CACHE_TIME: 1000 * 60 * 60 * 48, //48h. Basically never change.
 };

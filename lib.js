@@ -5,7 +5,7 @@ const path = require("path");
 const { GasPrice } = require("@cosmjs/stargate");
 const { DirectSecp256k1HdWallet } = require("@cosmjs/proto-signing");
 const { SigningCosmWasmClient } = require("@cosmjs/cosmwasm-stargate");
-const { USDC_DENOM, OVERRIDE_RPC, BVBCONTRACT, MARKET_CACHE_TIME, PRICE_CACHE_TIME, CACHE_DIR, MARS } = require("./consts");
+const { USDC_DENOM, OVERRIDE_RPC, BVBCONTRACT, MARKET_CACHE_TIME, PRICE_CACHE_TIME, MAX_LEVERAGE_CACHE_TIME, CACHE_DIR, MARS } = require("./consts");
 const SEED = process.env.SEED;
 const { chains } = require("chain-registry");
 
@@ -37,15 +37,59 @@ async function getClient(seedOverride = null) {
 }
 
 async function getPositions(address = null) {
-  const positions = await client.signingClient.queryContractSmart(BVBCONTRACT, {
-    user_positions_new: { user: address || client.myAddress, position_type: "Classic" },
-  });
-  return positions;
+  /*Returns an array of position objects that look like below:
+  [
+    {
+      "id": 1234,
+      "user": "neutron1...",
+      "credit_account_id": "4567",
+      "assets": [
+        {
+          "denom": "perps/ubtc",
+          "long": true,
+          "size": "0.0009",
+          "collateral_percent": "0.5",
+          "exec_price": "84800",
+          "leverage": "3"
+        },
+         {
+          "denom": "perps/ueth",
+          "long": false,
+          "size": "-1",
+          "collateral_percent": "0.5",
+          "exec_price": "1800.53",
+          "leverage": "3"
+        }
+      ],
+      "collateral_amount": "10000000",
+      "leverage": "3",
+      "created_at": "1745516650526230395",
+      "position_type": "Classic",
+      "cluster_id": null,
+      "cluster_name": null
+    }
+  ]
+  */
+  try {
+    const positions = await client.signingClient.queryContractSmart(BVBCONTRACT, {
+      user_positions_new: { user: address || client.myAddress, position_type: "Classic" },
+    });
+    return positions;
+  } catch (err) {
+    console.error(chalk.red("Error getting positions:", err.message));
+    return [];
+  }
 }
 
 async function getBalance(denom = USDC_DENOM) {
-  const balance = await client.signingClient.getBalance(client.myAddress, denom);
-  return balance.amount / DIVISOR || 0;
+  //Returns the balance of the user in the specified denom, defaults to usdc.
+  try {
+    const balance = await client.signingClient.getBalance(client.myAddress, denom);
+    return balance.amount / DIVISOR || 0;
+  } catch (err) {
+    console.error(chalk.red("Error getting balance:", err.message));
+    return 0;
+  }
 }
 
 async function tryCache(cachePath, cacheTime, fetchDataFn) {
@@ -106,6 +150,21 @@ async function getMarkets() {
   return result.data || [];
 }
 
+async function getMaxLeverages() {
+  //Gets the max leverages for all available markets. Returns an object like: {"perps/ubtc":10, "perps/ueth":10}
+  const maxLeverageCachePath = path.join(CACHE_DIR, "leverages.json");
+
+  const fetchMaxLeverages = async () => {
+    const maxLeverages = await client.signingClient.queryContractSmart(BVBCONTRACT, {
+      max_leverages: {},
+    });
+    return maxLeverages;
+  };
+
+  const result = await tryCache(maxLeverageCachePath, MAX_LEVERAGE_CACHE_TIME, fetchMaxLeverages);
+  return result.data || [];
+}
+
 async function getPrices() {
   //Returns all price data for all available markets. Returns an object like: {"perps/ubtc":"93500.50", "perps/ueth":"1850.23"}
   const priceCachePath = path.join(CACHE_DIR, "prices.json");
@@ -122,10 +181,50 @@ async function getPrices() {
   return result.data || {};
 }
 
+async function openPosition(assets, leverage, collateral) {
+  try {
+    const msg = {
+      open_position: {
+        position_input: {
+          Classic: {
+            assets: assets,
+            leverage: leverage.toString(),
+          },
+        },
+      },
+    };
+
+    const funds = [{ denom: USDC_DENOM, amount: (collateral * DIVISOR).toString() }];
+    const result = await client.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Opened", funds);
+    console.log(chalk.green("Position Opened: ", JSON.stringify(assets), "with", leverage, "x leverage and", collateral, "USDC collateral"));
+    return result;
+  } catch (error) {
+    console.error(chalk.red("Error opening position:", error.message));
+    return null;
+  }
+}
+
+async function closePosition(positionId) {
+  try {
+    const msg = {
+      close: { position_id: positionId },
+    };
+    const result = await client.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Closed");
+    console.log(chalk.green("Position Closed: ", positionId));
+    return result;
+  } catch (err) {
+    console.error(chalk.red("Error closing position:", err.message));
+    return null;
+  }
+}
+
 module.exports = {
   getClient,
   getPositions,
   getBalance,
   getMarkets,
   getPrices,
+  getMaxLeverages,
+  openPosition,
+  closePosition,
 };
