@@ -5,7 +5,7 @@ const path = require("path");
 const { GasPrice } = require("@cosmjs/stargate");
 const { DirectSecp256k1HdWallet } = require("@cosmjs/proto-signing");
 const { SigningCosmWasmClient } = require("@cosmjs/cosmwasm-stargate");
-const { USDC_DENOM, OVERRIDE_RPC, BVBCONTRACT, MARKET_CACHE_TIME, PRICE_CACHE_TIME, MAX_LEVERAGE_CACHE_TIME, CACHE_DIR, MARS } = require("./consts");
+const { USDC_DENOM, OVERRIDE_RPC, BVBCONTRACT, MARKET_CACHE_TIME, PRICE_CACHE_TIME, MAX_LEVERAGE_CACHE_TIME, FUNDING_RATE_CACHE_TIME, CACHE_DIR, MARS } = require("./consts");
 const SEED = process.env.SEED;
 const { chains } = require("chain-registry");
 
@@ -165,6 +165,49 @@ async function getMaxLeverages() {
   return result.data || [];
 }
 
+async function getFundingRates() {
+  /*Gets the funding rates for all markets. Returns an object like: 
+    Funding Rates: {
+      'perps/uakt': {
+        fundingRate: 13.69071489640399,
+        longOI: '3969947062',
+        shortOI: '6066533265'
+      },
+      'perps/uarb': {
+        fundingRate: 32.59113048323023,
+        longOI: '129937160',
+        shortOI: '24324580'
+      }
+    }
+    Funding rates are a yearly percentage.
+    If it is POSITIVE, long positions pay short positions this rate.
+    If it is negative, short positions pay long positions this rate.
+  */
+  const fundingRateCache = path.join(CACHE_DIR, "rates.json");
+
+  const fetchFundingRates = async () => {
+    const rates = await client.signingClient.queryContractSmart(MARS.PERPS, {
+      markets: {
+        limit: 50,
+      },
+    });
+
+    const fundingData = {};
+    for (const rate of rates.data) {
+      fundingData[rate.denom] = {
+        fundingRate: parseFloat(rate.current_funding_rate || 0) * 365 * 100,
+        longOI: rate.long_oi_value,
+        shortOI: rate.short_oi_value,
+      };
+    }
+
+    return fundingData;
+  };
+
+  const result = await tryCache(fundingRateCache, FUNDING_RATE_CACHE_TIME, fetchFundingRates);
+  return result.data || [];
+}
+
 async function getPrices() {
   //Returns all price data for all available markets. Returns an object like: {"perps/ubtc":"93500.50", "perps/ueth":"1850.23"}
   const priceCachePath = path.join(CACHE_DIR, "prices.json");
@@ -195,7 +238,7 @@ async function openPosition(assets, leverage, collateral) {
     };
 
     const funds = [{ denom: USDC_DENOM, amount: (collateral * DIVISOR).toString() }];
-    const result = await client.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Opened", funds);
+    const result = await client.signingClient.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Opened", funds);
     console.log(chalk.green("Position Opened: ", JSON.stringify(assets), "with", leverage, "x leverage and", collateral, "USDC collateral"));
     return result;
   } catch (error) {
@@ -209,7 +252,7 @@ async function closePosition(positionId) {
     const msg = {
       close: { position_id: positionId },
     };
-    const result = await client.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Closed");
+    const result = await client.signingClient.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Closed");
     console.log(chalk.green("Position Closed: ", positionId));
     return result;
   } catch (err) {
@@ -227,4 +270,5 @@ module.exports = {
   getMaxLeverages,
   openPosition,
   closePosition,
+  getFundingRates,
 };
