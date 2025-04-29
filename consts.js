@@ -1,5 +1,5 @@
 module.exports = {
-  OVERRIDE_RPC: "https://rpc-lb.neutron.org", //If set this rpc will be used, otherwise one will automatically be selected from the registry
+  OVERRIDE_RPC: null, //If set this rpc will be used, otherwise one will automatically be selected from the registry
   USDC_DENOM: "ibc/B559A80D62249C8AA07A380E2A2BEA6E5CA9A6F079C912C3A9E9B494105E4F81",
   BVBCONTRACT: "neutron17v2cwmaynxhc004uph4rle45feepg0z86wwxkue2kc0t5hx82f2s6gmu73",
   MARS: {
