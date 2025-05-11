@@ -1,9 +1,20 @@
 {
+  "name": "bullbear-adaptive-momentum-focus",
+  "version": "1.0.0",
+  "description": "A sophisticated trading strategy for BullBear.zone that adapts to market conditions using multiple signals",
+  "main": "adaptive-momentum-focus.js",
+  "scripts": {
+    "start": "node adaptive-momentum-focus.js",
+    "funding-skew": "node strategies/funding-skew-reversal.js",
+    "funding-flip": "node funding-flip-flop.js"
+  },
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.33.1",
     "@cosmjs/stargate": "^0.33.1",
+    "axios": "^1.6.0",
     "chain-registry": "^1.69.192",
     "chalk": "^4.1.2",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.5.0",
+    "node-cron": "^3.0.2"
   }
 }

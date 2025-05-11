@@ -237,6 +237,9 @@ async function openPosition(assets, leverage, collateral) {
       },
     };
 
+    console.log(chalk.blue("Opening position with message:"), JSON.stringify(msg, null, 2));
+    console.log(chalk.blue("Funds:"), JSON.stringify([{ denom: USDC_DENOM, amount: (collateral * DIVISOR).toString() }], null, 2));
+
     const funds = [{ denom: USDC_DENOM, amount: (collateral * DIVISOR).toString() }];
     const result = await client.signingClient.execute(client.myAddress, BVBCONTRACT, msg, "auto", "BullBear.Zone Position Opened", funds);
     console.log(chalk.green("Position Opened: ", JSON.stringify(assets), "with", leverage, "x leverage and", collateral, "USDC collateral"));
