@@ -87,7 +87,14 @@ function loadState() {
 
 function saveState(state) {
   try {
-    fs.writeFileSync(CONFIG.STATE_FILE, JSON.stringify(state, null, 2));
+    // Helper function to make objects JSON-serializable
+    function makeSerializable(obj) {
+      return JSON.parse(JSON.stringify(obj, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value
+      ));
+    }
+    
+    fs.writeFileSync(CONFIG.STATE_FILE, JSON.stringify(makeSerializable(state), null, 2));
   } catch (err) {
     console.error(chalk.red("Error saving state:", err.message));
   }
@@ -95,17 +102,29 @@ function saveState(state) {
 
 function recordTrade(position, action, result, metrics = {}) {
   try {
+    // Helper function to make objects JSON-serializable
+    function makeSerializable(obj) {
+      return JSON.parse(JSON.stringify(obj, (key, value) => 
+        typeof value === 'bigint' ? value.toString() : value
+      ));
+    }
+    
     let history = [];
     if (fs.existsSync(CONFIG.HISTORY_FILE)) {
       history = JSON.parse(fs.readFileSync(CONFIG.HISTORY_FILE, "utf8"));
     }
     
+    // Ensure all data is serializable
+    const serializablePosition = makeSerializable(position);
+    const serializableResult = makeSerializable(result);
+    const serializableMetrics = makeSerializable(metrics);
+    
     history.push({
       timestamp: Date.now(),
       action, // "open" or "close"
-      position,
-      metrics, // Additional metrics like skew values, correlations, etc.
-      result: result || null,
+      position: serializablePosition,
+      metrics: serializableMetrics,
+      result: serializableResult || null,
     });
     
     fs.writeFileSync(CONFIG.HISTORY_FILE, JSON.stringify(history, null, 2));
@@ -644,19 +663,19 @@ async function managePositions(state, enabledMarkets) {
         }
       }
       
-      // If no complementary asset found, use the same asset in opposite direction
-      // This maximizes our exposure to funding rate differential
-      if (!complementaryAsset) {
-        complementaryAsset = {
-          denom: opportunity.denom,
-          long: opportunity.direction !== "long", // Opposite direction
-          percent: "0.5"
-        };
+      // Define the assets array based on whether we found a complementary asset
+      let assets;
+      
+      if (complementaryAsset) {
+        // If we found a valid complementary asset, use a paired position
+        assets = [primaryAsset, complementaryAsset];
+        console.log(chalk.blue(`Opening balanced position with assets: ${JSON.stringify(assets)}`));
+      } else {
+        // If no complementary asset found, use a single-asset position
+        primaryAsset.percent = "1";  // Update to use 100% allocation
+        assets = [primaryAsset];
+        console.log(chalk.blue(`Opening single-asset position with: ${JSON.stringify(assets)}`));
       }
-      
-      const assets = [primaryAsset, complementaryAsset];
-      
-      console.log(chalk.blue(`Opening position with assets: ${JSON.stringify(assets)}`));
       
       // Open the position
       const result = await openFSRPosition(assets);
@@ -664,11 +683,34 @@ async function managePositions(state, enabledMarkets) {
       // Extract position ID from result
       let positionId = null;
       if (result && result.events) {
+        // Multiple approaches to extract position ID
         const events = JSON.stringify(result.events);
+        
+        // Approach 1: Look for position_id pattern
         const match = events.match(/position_id[\"']?:[\s]*[\"']?(\d+)/);
-        if (match) {
+        if (match && match[1]) {
           positionId = match[1];
+          console.log(chalk.green(`✅ Successfully extracted position ID: ${positionId}`));
         }
+        
+        // Approach 2: Parse events to find position ID
+        if (!positionId && result.events.length > 0) {
+          for (const event of result.events) {
+            if (event.type === 'wasm' && event.attributes) {
+              for (const attr of event.attributes) {
+                if (attr.key === 'position_id') {
+                  positionId = attr.value;
+                  console.log(chalk.green(`✅ Successfully extracted position ID: ${positionId}`));
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      if (!positionId) {
+        console.log(chalk.yellow(`⚠️ Could not extract position ID from result. Raw event data: ${JSON.stringify(result.events || {})}`));
       }
       
       if (positionId || CONFIG.DRY_RUN) {
@@ -695,7 +737,8 @@ async function managePositions(state, enabledMarkets) {
           createdAt: Date.now(),
           assets,
           entryPrices,
-          entryFundingRates
+          entryFundingRates,
+          strategy: 'fsr' // Mark this position as belonging to this strategy
         };
         
         saveState(state);

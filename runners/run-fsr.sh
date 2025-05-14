@@ -6,15 +6,23 @@
 # Default interval: 30 minutes (1800 seconds)
 # Override with: INTERVAL=<seconds> ./run-fsr.sh
 
+# Change to the root directory to ensure access to .env and lib files
+cd $(dirname $0)/..
+ROOT_DIR=$(pwd)
+
 # Set log file
-LOG_DIR="./logs"
-LOG_FILE="$LOG_DIR/fsr-$(date +%Y%m%d).log"
+LOG_DIR="$ROOT_DIR/logs"
+STRATEGY="$ROOT_DIR/strategies/funding-skew-reversal.js"
 
 # Create logs directory if it doesn't exist
 mkdir -p $LOG_DIR
 
 # Set default interval if not provided
 INTERVAL=${INTERVAL:-1800}
+
+# Set log file with date
+DATE=$(date +%Y%m%d)
+LOG_FILE="$LOG_DIR/fsr-$DATE.log"
 
 echo "==== FSR Strategy Runner ====" | tee -a "$LOG_FILE"
 echo "Starting with interval: $INTERVAL seconds" | tee -a "$LOG_FILE"
@@ -29,7 +37,7 @@ run_strategy() {
     echo "-------------------------" | tee -a "$LOG_FILE"
     
     # Run the strategy
-    node strategies/funding-skew-reversal.js 2>&1 | tee -a "$LOG_FILE"
+    node $STRATEGY | tee -a "$LOG_FILE"
     
     echo "-------------------------" | tee -a "$LOG_FILE"
     echo "Completed at $(date)" | tee -a "$LOG_FILE"

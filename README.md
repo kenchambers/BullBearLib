@@ -1,49 +1,69 @@
-# BullBear Trading Strategies
+# BullBearLib
 
-This repository contains SDK and sample trading strategies for BullBear.zone on Neutron.
-
-## Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# Run the RMM strategy (best for demo purposes - runs every 2 minutes)
-./run-rmm.sh
-
-# Run other strategies
-./run-tfoid.sh
-```
+BullBearLib is a collection of trading strategies and utilities for [BullBear.zone](https://www.bullbear.zone/), a Perpetual DEX on Neutron.
 
 ## Repository Structure
 
-- `lib.js` - Core trading SDK with wallet loading, price & funding queries, position management
-- `consts.js` - Configuration constants
-- `strategies/` - Sample trading strategies
-  - See [Strategies README](strategies/README.md) for details on each strategy
-- `run-*.sh` - Runner scripts for continuous execution of strategies
+- **strategies/** - Trading strategy implementations
+- **runners/** - Shell scripts for running strategies continuously
+- **logs/** - Log output from strategy runs
+- **cache/** - Cached data and strategy state
+- **lib.js** - Core trading functions for BullBear.zone
+- **consts.js** - System constants
 
 ## Available Strategies
 
-1. **RMM (Rapid Market Momentum)** - Demo-focused strategy that opens trades frequently with minimal barriers
-2. **TFOID (Trend-Following OI Divergence)** - Identifies trend continuation setups using open interest divergence
-3. **SMART (Semantic Multi-Narrative Arbitrage Trader)** - Trading strategy based on funding rate opportunities
+| Strategy | Description | Documentation |
+|----------|-------------|---------------|
+| Funding Rate Arbitrage (FRA) | Captures funding rate differentials | [FRA Docs](strategies/fra-docs.md) |
+| Momentum Breakout Follower (MBF) | Follows price breakouts with momentum | [MBF Docs](strategies/mbf-docs.md) |
+| Yield Harvester (YH) | Captures funding rate yield from extreme markets | [YH Docs](strategies/yh-docs.md) |
+| Volatility Breakout Hunter (VBH) | Trades high volatility breakouts | [VBH Docs](strategies/vbh-docs.md) |
+| Funding Skew Reversal (FSR) | Trades assets with misaligned funding rates | [FSR Docs](strategies/fsr-strategy-docs.md) |
 
-## Implementation Requirements
+## Getting Started
 
-All strategies follow these requirements:
-- Minimum 10 USDC collateral per trade
-- Asset payload as balanced long-short pair with percentages summing to 1.0
-- Trading only enabled assets via `getMarkets()`
-- Proper RPC error handling
-- State persistence for tracking positions
-- Configurable exit logic
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Development
+2. Set up your environment variables:
+   ```bash
+   # Create .env file with your mnemonic seed
+   echo "SEED=your mnemonic seed phrase here" > .env
+   ```
 
-To create your own strategy:
-1. Add your strategy file to the `strategies/` directory
-2. Create a runner script that executes the strategy on a loop
-3. Add documentation in `strategies/docs/`
+3. Run a strategy:
+   ```bash
+   # Run the Funding Rate Arbitrage strategy
+   ./runners/run-fra.sh
+   ```
 
-Refer to the existing examples for the proper implementation pattern.
+## Strategy Execution
+
+Each strategy can be run using its respective runner script:
+
+```bash
+# Run with default settings (30-minute interval)
+./runners/run-fra.sh
+
+# Run with custom interval (in seconds)
+INTERVAL=900 ./runners/run-mbf.sh  # Run every 15 minutes
+
+# You can also run from within the runners directory
+cd runners
+./run-fra.sh
+```
+
+## Creating New Strategies
+
+See [strategies/README.md](strategies/README.md) for information on creating and documenting new strategies.
+
+## License
+
+This repository is provided for educational purposes only. Use at your own risk.
+
+## Acknowledgements
+
+This library uses the BullBear.zone API as documented in [bullBear.md](bullBear.md).

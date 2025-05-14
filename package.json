@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node adaptive-momentum-focus.js",
     "funding-skew": "node strategies/funding-skew-reversal.js",
-    "funding-flip": "node funding-flip-flop.js"
+    "funding-flip": "node funding-flip-flop.js",
+    "vbh": "node volatility-breakout-hunter.js",
+    "yield-harvester": "node yield-harvester.js",
+    "mbf": "node momentum-breakout-follower.js"
   },
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.33.1",
